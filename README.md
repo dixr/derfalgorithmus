@@ -11,7 +11,7 @@ flutter run
 
 ## Building Android APK
 
-Building an apk can be done with
+Building an APK can be done with
 ```
 flutter build apk --release
 ```
