@@ -24,6 +24,8 @@ class PersonData {
   PersonData(this.name, this.paid);
   String name = '';
   double paid = 0;
+  TextEditingController namecontroller = TextEditingController();
+  TextEditingController paidcontroller = TextEditingController();
 }
 
 class ScrollableTabs extends StatefulWidget {
@@ -32,7 +34,12 @@ class ScrollableTabs extends StatefulWidget {
 }
 
 class ScrollableTabsState extends State<ScrollableTabs>
-    with SingleTickerProviderStateMixin {
+    with
+        SingleTickerProviderStateMixin,
+        AutomaticKeepAliveClientMixin<ScrollableTabs> {
+  @override
+  bool get wantKeepAlive => true;
+
   TabController _controller;
 
   List<PersonData> _personData = [
@@ -44,18 +51,29 @@ class ScrollableTabsState extends State<ScrollableTabs>
 
   List<PersonData> _resultsData = [];
 
+  @override
+  void initState() {
+    super.initState();
+    _controller = TabController(vsync: this, length: _allPages.length);
+    _resultsData = _personData.map((p) => PersonData(p.name, p.paid)).toList();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
   void _add() {
     setState(() {
       switch (_controller.index) {
         case 0:
-          _personData
-              .add(PersonData('Person ' + _personData.length.toString(), 0));
-          break;
-
-        case 1:
+          _personData.add(
+              PersonData('Person ' + (_personData.length + 1).toString(), 0));
           break;
       }
     });
+    _updateResults();
   }
 
   void _remove() {
@@ -64,19 +82,28 @@ class ScrollableTabsState extends State<ScrollableTabs>
         case 0:
           if (_personData.length > 1) _personData.removeLast();
           break;
-
-        case 1:
-          break;
       }
     });
+    _updateResults();
   }
 
-  void _computeResults() {
-    double sum =
-        _personData.fold(0.0, (sum, p) => sum + p.paid) / _personData.length;
-    _resultsData = _personData
-        .map((p) => PersonData(p.name, sum - p.paid))
-        .toList(); // TODO: change to text with instruction
+  void _updateResults() {
+    setState(() {
+      for (int i = 0; i < _personData.length; ++i) {
+        if (_personData[i].namecontroller.text.isNotEmpty)
+          _personData[i].name = _personData[i].namecontroller.text;
+        _personData[i].paid = double.tryParse(
+                _personData[i].paidcontroller.text.replaceAll(',', '.')) ??
+            0.0;
+        print(_personData[i].name +
+            ': ' +
+            _personData[i].paid.toStringAsFixed(2));
+      }
+      double sum =
+          _personData.fold(0.0, (sum, p) => sum + p.paid) / _personData.length;
+      _resultsData =
+          _personData.map((p) => PersonData(p.name, sum - p.paid)).toList();
+    });
   }
 
   List<Widget> _createTabForms(int pageidx) {
@@ -88,18 +115,21 @@ class ScrollableTabsState extends State<ScrollableTabs>
           child: Row(
             children: [
               Expanded(
-                child: TextFormField(
-                    textCapitalization: TextCapitalization.words,
-                    decoration: InputDecoration(
-                      border: UnderlineInputBorder(),
-                      hintText: 'Name',
-                      labelText: 'Person ' + (idx + 1).toString(),
-                    ),
-                    onSaved: (value) => _personData[idx].name = value),
+                child: TextField(
+                  controller: _personData[idx].namecontroller,
+                  textCapitalization: TextCapitalization.words,
+                  decoration: InputDecoration(
+                    border: UnderlineInputBorder(),
+                    hintText: 'Name',
+                    labelText: 'Person ' + (idx + 1).toString(),
+                  ),
+                  onChanged: (value) => _updateResults(),
+                ),
               ),
               SizedBox(width: 8.0),
               Expanded(
-                child: TextFormField(
+                child: TextField(
+                  controller: _personData[idx].paidcontroller,
                   keyboardType: TextInputType.number,
                   decoration: InputDecoration(
                       border: UnderlineInputBorder(),
@@ -107,8 +137,7 @@ class ScrollableTabsState extends State<ScrollableTabs>
                       prefixText: '\€',
                       suffixText: 'Euro',
                       suffixStyle: TextStyle(color: Colors.green)),
-                  onSaved: (value) =>
-                      _personData[idx].paid = num.tryParse(value),
+                  onChanged: (value) => _updateResults(),
                   maxLines: 1,
                 ),
               ),
@@ -126,26 +155,27 @@ class ScrollableTabsState extends State<ScrollableTabs>
         ),
       );
     } else {
-      _computeResults();
       widgets.add(
         DataTable(
           columns: [
             DataColumn(
               label: Text('Person'),
+              onSort: (i, b) {},
             ),
             DataColumn(
-              label: Text('Action'),
+              label: Text('has to pay'),
               tooltip:
                   'The total amount of money this person has to put in the pot.',
               numeric: true,
+              onSort: (i, b) {},
             ),
           ],
           rows: _resultsData
               .map(
                 (p) => DataRow(
                       cells: [
-                        DataCell(Text(p.name)),
-                        DataCell(Text(p.paid.toString())),
+                        DataCell(Text(p.name), onTap: () {}),
+                        DataCell(Text(p.paid.toStringAsFixed(2)), onTap: () {}),
                       ],
                     ),
               )
@@ -157,19 +187,8 @@ class ScrollableTabsState extends State<ScrollableTabs>
   }
 
   @override
-  void initState() {
-    super.initState();
-    _controller = TabController(vsync: this, length: _allPages.length);
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
+    super.build(context);
     return Scaffold(
       appBar: AppBar(
         title: Text('DerFAlgorithmus'),
