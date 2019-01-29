@@ -41,6 +41,7 @@ class ScrollableTabsState extends State<ScrollableTabs>
   bool get wantKeepAlive => true;
 
   TabController _controller;
+  ScrollController _personscrollcontroller = ScrollController();
 
   List<PersonData> _personData = [
     PersonData('Person 1', 0),
@@ -65,25 +66,26 @@ class ScrollableTabsState extends State<ScrollableTabs>
   }
 
   void _add() {
-    setState(() {
-      switch (_controller.index) {
-        case 0:
+    switch (_controller.index) {
+      case 0:
+        setState(() {
           _personData.add(
               PersonData('Person ' + (_personData.length + 1).toString(), 0));
-          break;
-      }
-    });
+        });
+        break;
+    }
     _updateResults();
   }
 
   void _remove() {
-    setState(() {
-      switch (_controller.index) {
-        case 0:
-          if (_personData.length > 1) _personData.removeLast();
-          break;
-      }
-    });
+    switch (_controller.index) {
+      case 0:
+        if (_personData.length > 1)
+          setState(() {
+            _personData.removeLast();
+          });
+        break;
+    }
     _updateResults();
   }
 
@@ -106,84 +108,90 @@ class ScrollableTabsState extends State<ScrollableTabs>
     });
   }
 
-  List<Widget> _createTabForms(int pageidx) {
-    final widgets = <Widget>[];
-    if (pageidx == 0) {
-      for (int idx = 0; idx < _personData.length; idx++) {
-        widgets.add(Padding(
-          padding: EdgeInsets.only(bottom: 8),
-          child: Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _personData[idx].namecontroller,
-                  textCapitalization: TextCapitalization.words,
-                  decoration: InputDecoration(
-                    border: UnderlineInputBorder(),
-                    hintText: 'Name',
-                    labelText: 'Person ' + (idx + 1).toString(),
+  Widget _createTabForms(int pageidx) {
+    switch (pageidx) {
+      case 0:
+        return ListView(
+          controller: _personscrollcontroller,
+          padding: EdgeInsets.all(8),
+          shrinkWrap: true,
+          reverse: true,
+          children: List.generate(_personData.length, (idx) {
+            return Padding(
+              padding: EdgeInsets.only(bottom: 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _personData[idx].namecontroller,
+                      textCapitalization: TextCapitalization.words,
+                      decoration: InputDecoration(
+                        border: UnderlineInputBorder(),
+                        hintText: 'Name',
+                        labelText: 'Person ' + (idx + 1).toString(),
+                      ),
+                      onChanged: (value) => _updateResults(),
+                    ),
                   ),
-                  onChanged: (value) => _updateResults(),
-                ),
+                  SizedBox(width: 8.0),
+                  Expanded(
+                    child: TextField(
+                      controller: _personData[idx].paidcontroller,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                          border: UnderlineInputBorder(),
+                          labelText: 'Money paid',
+                          prefixText: '\€',
+                          suffixText: 'Euro',
+                          suffixStyle: TextStyle(color: Colors.green)),
+                      onChanged: (value) => _updateResults(),
+                      maxLines: 1,
+                    ),
+                  ),
+                ],
               ),
-              SizedBox(width: 8.0),
-              Expanded(
-                child: TextField(
-                  controller: _personData[idx].paidcontroller,
-                  keyboardType: TextInputType.number,
-                  decoration: InputDecoration(
-                      border: UnderlineInputBorder(),
-                      labelText: 'Money paid',
-                      prefixText: '\€',
-                      suffixText: 'Euro',
-                      suffixStyle: TextStyle(color: Colors.green)),
-                  onChanged: (value) => _updateResults(),
-                  maxLines: 1,
-                ),
-              ),
-            ],
-          ),
-        ));
-      }
-    } else if (pageidx == 1) {
-      widgets.add(
-        Center(
+            );
+          }).reversed.toList(),
+        );
+
+      case 1:
+        return Center(
           child: Icon(
             _allPages[pageidx].icon,
             size: 128.0,
           ),
-        ),
-      );
-    } else {
-      widgets.add(
-        DataTable(
-          columns: [
-            DataColumn(
-              label: Text('Person'),
-              onSort: (i, b) {},
-            ),
-            DataColumn(
-              label: Text('has to pay'),
-              tooltip:
-                  'The total amount of money this person has to put in the pot.',
-              numeric: true,
-              onSort: (i, b) {},
-            ),
-          ],
-          rows: _resultsData
-              .map(
-                (p) => DataRow(
-                      cells: [
-                        DataCell(Text(p.name), onTap: () {}),
-                        DataCell(Text(p.paid.toStringAsFixed(2)), onTap: () {}),
-                      ],
-                    ),
-              )
-              .toList(),
-        ),
-      );
+        );
+
+      default:
+        return SingleChildScrollView(
+          child: DataTable(
+            columns: [
+              DataColumn(
+                label: Text('Person'),
+                onSort: (i, b) {},
+              ),
+              DataColumn(
+                label: Text('has to pay'),
+                tooltip:
+                    'The total amount of money this person has to put in the pot.',
+                numeric: true,
+                onSort: (i, b) {},
+              ),
+            ],
+            rows: _resultsData
+                .map(
+                  (p) => DataRow(
+                        cells: [
+                          DataCell(Text(p.name), onTap: () {}),
+                          DataCell(Text(p.paid.toStringAsFixed(2)),
+                              onTap: () {}),
+                        ],
+                      ),
+                )
+                .toList(),
+          ),
+        );
     }
-    return widgets;
   }
 
   @override
@@ -209,13 +217,12 @@ class ScrollableTabsState extends State<ScrollableTabs>
             return SafeArea(
               top: false,
               bottom: false,
-              child: Container(
-                key: ObjectKey(_allPages[pageidx].icon),
-                padding: EdgeInsets.all(8.0),
-                child: Card(
-                  child: ListView(
-                    padding: EdgeInsets.all(8),
-                    children: _createTabForms(pageidx),
+              child: Center(
+                child: Container(
+                  margin: EdgeInsets.all(8.0),
+                  alignment: Alignment(0.0, -1.0),
+                  child: Card(
+                    child: _createTabForms(pageidx),
                   ),
                 ),
               ),
