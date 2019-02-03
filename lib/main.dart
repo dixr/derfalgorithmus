@@ -20,12 +20,70 @@ const List<_Page> _allPages = <_Page>[
   _Page(icon: Icons.check_circle, text: 'RESULTS'),
 ];
 
+enum PageID {
+  Persons,
+  Conditions,
+  Results,
+}
+
 class PersonData {
   PersonData(this.name, this.paid);
   String name = '';
   double paid = 0;
+  double hastopay = 0;
+  double conditiontopay = 0;
+  bool conditionsexpanded = false;
+
   TextEditingController namecontroller = TextEditingController();
   TextEditingController paidcontroller = TextEditingController();
+
+  ExpansionPanelHeaderBuilder get headerBuilder {
+    return (BuildContext context, bool isExpanded) {
+      return Padding(
+          padding: EdgeInsets.only(left: 16),
+          child: Row(children: [
+            SizedBox(width: 8),
+            Expanded(
+                flex: 3,
+                child: Text(name,
+                    style:
+                        TextStyle(fontSize: 14.0, color: Color(0xdd000000)))),
+            SizedBox(width: 8),
+            Expanded(
+                flex: 2,
+                child: Text(conditiontopay.toStringAsFixed(2) + ' \€',
+                    style: TextStyle(fontSize: 14.0, color: Color(0x8a000000))))
+          ]));
+    };
+  }
+
+  List<Widget> buildConditionsList() {
+    return [
+      Divider(height: 1),
+      InkWell(
+          onTap: () {}, // TODO: pass edit alert window callback
+          child: Padding(
+              padding: EdgeInsets.all(16),
+              child: Row(children: [
+                SizedBox(width: 8),
+                Expanded(
+                  flex: 3,
+                  child: Text("Coffee",
+                      style:
+                          TextStyle(fontSize: 14.0, color: Color(0xdd000000))),
+                ),
+                SizedBox(width: 8),
+                Expanded(
+                  flex: 2,
+                  child: Text(conditiontopay.toStringAsFixed(2) + ' \€',
+                      textAlign: TextAlign.right,
+                      style:
+                          TextStyle(fontSize: 14.0, color: Color(0x8a000000))),
+                ),
+                SizedBox(width: 8),
+              ])))
+    ];
+  }
 }
 
 class ScrollableTabs extends StatefulWidget {
@@ -40,8 +98,8 @@ class ScrollableTabsState extends State<ScrollableTabs>
   @override
   bool get wantKeepAlive => true;
 
+  PageID _pageid = PageID.Persons;
   TabController _controller;
-  ScrollController _personscrollcontroller = ScrollController();
 
   List<PersonData> _personData = [
     PersonData('Person 1', 0),
@@ -50,13 +108,11 @@ class ScrollableTabsState extends State<ScrollableTabs>
     PersonData('Person 4', 0),
   ];
 
-  List<PersonData> _resultsData = [];
-
   @override
   void initState() {
     super.initState();
     _controller = TabController(vsync: this, length: _allPages.length);
-    _resultsData = _personData.map((p) => PersonData(p.name, p.paid)).toList();
+    _controller.addListener(_handlePageSelection);
   }
 
   @override
@@ -65,25 +121,35 @@ class ScrollableTabsState extends State<ScrollableTabs>
     super.dispose();
   }
 
+  void _handlePageSelection() {
+    setState(() {
+      _pageid = PageID.values[_controller.index];
+    });
+  }
+
   void _add() {
-    switch (_controller.index) {
-      case 0:
+    switch (_pageid) {
+      case PageID.Persons:
         setState(() {
           _personData.add(
               PersonData('Person ' + (_personData.length + 1).toString(), 0));
         });
+        break;
+      default:
         break;
     }
     _updateResults();
   }
 
   void _remove() {
-    switch (_controller.index) {
-      case 0:
+    switch (_pageid) {
+      case PageID.Persons:
         if (_personData.length > 1)
           setState(() {
             _personData.removeLast();
           });
+        break;
+      default:
         break;
     }
     _updateResults();
@@ -103,67 +169,81 @@ class ScrollableTabsState extends State<ScrollableTabs>
       }
       double sum =
           _personData.fold(0.0, (sum, p) => sum + p.paid) / _personData.length;
-      _resultsData =
-          _personData.map((p) => PersonData(p.name, sum - p.paid)).toList();
+      for (int i = 0; i < _personData.length; ++i)
+        _personData[i].hastopay = sum - _personData[i].paid;
     });
   }
 
   Widget _createTabForms(int pageidx) {
-    switch (pageidx) {
-      case 0:
-        return ListView(
-          controller: _personscrollcontroller,
-          padding: EdgeInsets.all(8),
-          shrinkWrap: true,
-          reverse: true,
-          children: List.generate(_personData.length, (idx) {
-            return Padding(
-              padding: EdgeInsets.only(bottom: 8),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _personData[idx].namecontroller,
-                      textCapitalization: TextCapitalization.words,
-                      decoration: InputDecoration(
-                        border: UnderlineInputBorder(),
-                        hintText: 'Name',
-                        labelText: 'Person ' + (idx + 1).toString(),
+    switch (PageID.values[pageidx]) {
+      case PageID.Persons:
+        return Column(children: [
+          Card(
+            elevation: 5,
+            child: Column(
+                children: List.generate(_personData.length, (idx) {
+              return Padding(
+                  padding: EdgeInsets.fromLTRB(8, 0, 8, 8),
+                  child: Row(children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _personData[idx].namecontroller,
+                        textCapitalization: TextCapitalization.words,
+                        decoration: InputDecoration(
+                          border: UnderlineInputBorder(),
+                          hintText: 'Name',
+                          labelText: 'Person ' + (idx + 1).toString(),
+                        ),
+                        onChanged: (value) => _updateResults(),
                       ),
-                      onChanged: (value) => _updateResults(),
                     ),
-                  ),
-                  SizedBox(width: 8.0),
-                  Expanded(
-                    child: TextField(
+                    SizedBox(width: 8),
+                    Expanded(
+                        child: TextField(
                       controller: _personData[idx].paidcontroller,
                       keyboardType: TextInputType.number,
                       decoration: InputDecoration(
                           border: UnderlineInputBorder(),
                           labelText: 'Money paid',
-                          prefixText: '\€',
+                          prefixText: '\€ ',
                           suffixText: 'Euro',
                           suffixStyle: TextStyle(color: Colors.green)),
                       onChanged: (value) => _updateResults(),
                       maxLines: 1,
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }).reversed.toList(),
-        );
-
-      case 1:
-        return Center(
-          child: Icon(
-            _allPages[pageidx].icon,
-            size: 128.0,
+                    ))
+                  ]));
+            })),
           ),
-        );
+          SizedBox(
+            height: 72,
+          )
+        ]);
 
-      default:
-        return SingleChildScrollView(
+      case PageID.Conditions:
+        return Column(children: [
+          Container(
+              margin: EdgeInsets.all(8),
+              child: ExpansionPanelList(
+                  expansionCallback: (int idx, bool isExpanded) {
+                    setState(() {
+                      _personData[idx].conditionsexpanded = !isExpanded;
+                    });
+                  },
+                  children: _personData.map((p) {
+                    return ExpansionPanel(
+                      isExpanded: p.conditionsexpanded,
+                      headerBuilder: p.headerBuilder,
+                      body: Column(children: p.buildConditionsList()),
+                    );
+                  }).toList())),
+          SizedBox(
+            height: 72,
+          )
+        ]);
+
+      case PageID.Results:
+        return Card(
+          elevation: 2,
           child: DataTable(
             columns: [
               DataColumn(
@@ -171,26 +251,53 @@ class ScrollableTabsState extends State<ScrollableTabs>
                 onSort: (i, b) {},
               ),
               DataColumn(
-                label: Text('has to pay'),
-                tooltip:
-                    'The total amount of money this person has to put in the pot.',
+                label: Text('Has to pay'),
+                tooltip: 'The total amount of money this person has to pay.',
                 numeric: true,
                 onSort: (i, b) {},
               ),
             ],
-            rows: _resultsData
-                .map(
-                  (p) => DataRow(
-                        cells: [
-                          DataCell(Text(p.name), onTap: () {}),
-                          DataCell(Text(p.paid.toStringAsFixed(2)),
-                              onTap: () {}),
-                        ],
-                      ),
-                )
+            rows: _personData
+                .map((p) => DataRow(cells: [
+                      DataCell(Text(p.name), onTap: () {}),
+                      DataCell(Text(p.hastopay.toStringAsFixed(2) + ' \€'),
+                          onTap: () {}),
+                    ]))
                 .toList(),
           ),
         );
+    }
+    return null;
+  }
+
+  Widget _buildFloatingActionButton() {
+    switch (_pageid) {
+      case PageID.Persons:
+        return Row(mainAxisAlignment: MainAxisAlignment.end, children: [
+          FloatingActionButton(
+            onPressed: _remove,
+            tooltip: 'Remove',
+            child: Icon(Icons.remove),
+          ),
+          SizedBox(
+            width: 8,
+          ),
+          FloatingActionButton(
+            onPressed: _add,
+            tooltip: 'Add',
+            child: Icon(Icons.add),
+          ),
+        ]);
+
+      case PageID.Conditions:
+        return FloatingActionButton(
+          onPressed: _add,
+          tooltip: 'Add',
+          child: Icon(Icons.add),
+        );
+
+      default:
+        return null;
     }
   }
 
@@ -199,54 +306,33 @@ class ScrollableTabsState extends State<ScrollableTabs>
     super.build(context);
     return Scaffold(
       appBar: AppBar(
-        title: Text('DerFAlgorithmus'),
-        bottom: TabBar(
-          controller: _controller,
-          isScrollable: true,
-          indicator: UnderlineTabIndicator(),
-          tabs: _allPages.map<Tab>((_Page page) {
-            return Tab(text: page.text, icon: Icon(page.icon));
-          }).toList(),
-        ),
-      ),
+          title: Text('DerFAlgorithmus'),
+          bottom: TabBar(
+            controller: _controller,
+            isScrollable: true,
+            indicator: UnderlineTabIndicator(),
+            tabs: _allPages.map<Tab>((_Page page) {
+              return Tab(text: page.text, icon: Icon(page.icon));
+            }).toList(),
+          )),
       body: TabBarView(
-        controller: _controller,
-        children: List.generate(
-          _allPages.length,
-          (pageidx) {
-            return SafeArea(
-              top: false,
-              bottom: false,
-              child: Center(
+          controller: _controller,
+          children: List.generate(
+            _allPages.length,
+            (pageidx) {
+              return SafeArea(
+                top: false,
+                bottom: false,
                 child: Container(
-                  margin: EdgeInsets.all(8.0),
-                  alignment: Alignment(0.0, -1.0),
-                  child: Card(
-                    child: _createTabForms(pageidx),
-                  ),
-                ),
-              ),
-            );
-          },
-        ),
-      ),
-      floatingActionButton: Column(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: <Widget>[
-          FloatingActionButton(
-            onPressed: _remove,
-            tooltip: 'Remove',
-            child: Icon(Icons.remove),
-          ),
-          SizedBox(height: 4),
-          FloatingActionButton(
-            onPressed: _add,
-            tooltip: 'Add',
-            child: Icon(Icons.add),
-          )
-        ],
-      ),
+                    margin:
+                        EdgeInsets.all(_pageid == PageID.Conditions ? 4 : 8),
+                    alignment: Alignment(0.0, -1.0),
+                    child:
+                        SingleChildScrollView(child: _createTabForms(pageidx))),
+              );
+            },
+          )),
+      floatingActionButton: _buildFloatingActionButton(),
     );
   }
 }
