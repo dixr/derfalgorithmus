@@ -1,4 +1,3 @@
-- implement conditions
-- replace listview in persons with singlechildscrollview like in conditions
+- implement edit conditions dialog
 - replace "-" button with trash can at the end of each row on persons tab
 - ask for confirmation when deleting

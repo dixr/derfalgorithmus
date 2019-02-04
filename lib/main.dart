@@ -28,10 +28,11 @@ enum PageID {
 
 class PersonData {
   PersonData(this.name, this.paid);
+
   String name = '';
   double paid = 0;
   double hastopay = 0;
-  double conditiontopay = 0;
+  double conditionstopay = 0;
   bool conditionsexpanded = false;
 
   TextEditingController namecontroller = TextEditingController();
@@ -51,38 +52,60 @@ class PersonData {
             SizedBox(width: 8),
             Expanded(
                 flex: 2,
-                child: Text(conditiontopay.toStringAsFixed(2) + ' \€',
+                child: Text(conditionstopay.toStringAsFixed(2) + ' \€',
                     style: TextStyle(fontSize: 14.0, color: Color(0x8a000000))))
           ]));
     };
   }
 
-  List<Widget> buildConditionsList() {
-    return [
-      Divider(height: 1),
-      InkWell(
-          onTap: () {}, // TODO: pass edit alert window callback
-          child: Padding(
-              padding: EdgeInsets.all(16),
-              child: Row(children: [
-                SizedBox(width: 8),
-                Expanded(
-                  flex: 3,
-                  child: Text("Coffee",
-                      style:
-                          TextStyle(fontSize: 14.0, color: Color(0xdd000000))),
-                ),
-                SizedBox(width: 8),
-                Expanded(
-                  flex: 2,
-                  child: Text(conditiontopay.toStringAsFixed(2) + ' \€',
-                      textAlign: TextAlign.right,
-                      style:
-                          TextStyle(fontSize: 14.0, color: Color(0x8a000000))),
-                ),
-                SizedBox(width: 8),
-              ])))
-    ];
+  List<Widget> buildConditionsList(
+      BuildContext context, int myIdx, List<ConditionData> conditions) {
+    return conditions
+        .where((c) => c.persons.contains(myIdx))
+        .map((c) {
+          return [
+            Divider(height: 1),
+            InkWell(
+                onTap: () => c.showEditDialog(context),
+                child: Padding(
+                    padding: EdgeInsets.all(16),
+                    child: Row(children: [
+                      SizedBox(width: 8),
+                      Expanded(
+                        flex: 3,
+                        child: Text(c.name,
+                            style: TextStyle(
+                                fontSize: 14.0, color: Color(0xdd000000))),
+                      ),
+                      SizedBox(width: 8),
+                      Expanded(
+                        flex: 2,
+                        child: Text(c.price.toStringAsFixed(2) + ' \€',
+                            textAlign: TextAlign.right,
+                            style: TextStyle(
+                                fontSize: 14.0, color: Color(0x8a000000))),
+                      ),
+                      SizedBox(width: 8),
+                    ])))
+          ];
+        })
+        .expand((i) => i)
+        .toList();
+  }
+}
+
+class ConditionData {
+  ConditionData(this.name, this.price, this.persons);
+
+  String name = "";
+  double price = 0.0;
+  List<int> persons = [];
+
+  void showEditDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) => Container(),
+    ); // need .then(() => setState)?
   }
 }
 
@@ -101,11 +124,16 @@ class ScrollableTabsState extends State<ScrollableTabs>
   PageID _pageid = PageID.Persons;
   TabController _controller;
 
-  List<PersonData> _personData = [
+  List<PersonData> personData = [
     PersonData('Person 1', 0),
     PersonData('Person 2', 0),
     PersonData('Person 3', 0),
     PersonData('Person 4', 0),
+  ];
+
+  List<ConditionData> conditions = [
+    ConditionData('Coffee', 2.0, [1, 2, 5]),
+    ConditionData('Bread', 5.0, [0, 2, 20]),
   ];
 
   @override
@@ -131,76 +159,75 @@ class ScrollableTabsState extends State<ScrollableTabs>
     switch (_pageid) {
       case PageID.Persons:
         setState(() {
-          _personData.add(
-              PersonData('Person ' + (_personData.length + 1).toString(), 0));
+          personData.add(
+              PersonData('Person ' + (personData.length + 1).toString(), 0));
         });
         break;
       default:
         break;
     }
-    _updateResults();
+    updateResults();
   }
 
   void _remove() {
     switch (_pageid) {
       case PageID.Persons:
-        if (_personData.length > 1)
+        if (personData.length > 1)
           setState(() {
-            _personData.removeLast();
+            personData.removeLast();
           });
         break;
       default:
         break;
     }
-    _updateResults();
+    updateResults();
   }
 
-  void _updateResults() {
+  void updateResults() {
     setState(() {
-      for (int i = 0; i < _personData.length; ++i) {
-        if (_personData[i].namecontroller.text.isNotEmpty)
-          _personData[i].name = _personData[i].namecontroller.text;
-        _personData[i].paid = double.tryParse(
-                _personData[i].paidcontroller.text.replaceAll(',', '.')) ??
+      for (int i = 0; i < personData.length; ++i) {
+        if (personData[i].namecontroller.text.isNotEmpty)
+          personData[i].name = personData[i].namecontroller.text;
+        personData[i].paid = double.tryParse(
+                personData[i].paidcontroller.text.replaceAll(',', '.')) ??
             0.0;
-        print(_personData[i].name +
-            ': ' +
-            _personData[i].paid.toStringAsFixed(2));
+        print(
+            personData[i].name + ': ' + personData[i].paid.toStringAsFixed(2));
       }
       double sum =
-          _personData.fold(0.0, (sum, p) => sum + p.paid) / _personData.length;
-      for (int i = 0; i < _personData.length; ++i)
-        _personData[i].hastopay = sum - _personData[i].paid;
+          personData.fold(0.0, (sum, p) => sum + p.paid) / personData.length;
+      for (int i = 0; i < personData.length; ++i)
+        personData[i].hastopay = sum - personData[i].paid;
     });
   }
 
-  Widget _createTabForms(int pageidx) {
+  Widget createTabForms(BuildContext context, int pageidx) {
     switch (PageID.values[pageidx]) {
       case PageID.Persons:
         return Column(children: [
           Card(
             elevation: 5,
             child: Column(
-                children: List.generate(_personData.length, (idx) {
+                children: List.generate(personData.length, (idx) {
               return Padding(
                   padding: EdgeInsets.fromLTRB(8, 0, 8, 8),
                   child: Row(children: [
                     Expanded(
                       child: TextField(
-                        controller: _personData[idx].namecontroller,
+                        controller: personData[idx].namecontroller,
                         textCapitalization: TextCapitalization.words,
                         decoration: InputDecoration(
                           border: UnderlineInputBorder(),
                           hintText: 'Name',
                           labelText: 'Person ' + (idx + 1).toString(),
                         ),
-                        onChanged: (value) => _updateResults(),
+                        onChanged: (value) => updateResults(),
                       ),
                     ),
                     SizedBox(width: 8),
                     Expanded(
                         child: TextField(
-                      controller: _personData[idx].paidcontroller,
+                      controller: personData[idx].paidcontroller,
                       keyboardType: TextInputType.number,
                       decoration: InputDecoration(
                           border: UnderlineInputBorder(),
@@ -208,15 +235,13 @@ class ScrollableTabsState extends State<ScrollableTabs>
                           prefixText: '\€ ',
                           suffixText: 'Euro',
                           suffixStyle: TextStyle(color: Colors.green)),
-                      onChanged: (value) => _updateResults(),
+                      onChanged: (value) => updateResults(),
                       maxLines: 1,
                     ))
                   ]));
             })),
           ),
-          SizedBox(
-            height: 72,
-          )
+          SizedBox(height: 72)
         ]);
 
       case PageID.Conditions:
@@ -226,19 +251,19 @@ class ScrollableTabsState extends State<ScrollableTabs>
               child: ExpansionPanelList(
                   expansionCallback: (int idx, bool isExpanded) {
                     setState(() {
-                      _personData[idx].conditionsexpanded = !isExpanded;
+                      personData[idx].conditionsexpanded = !isExpanded;
                     });
                   },
-                  children: _personData.map((p) {
+                  children: List.generate(personData.length, (idx) {
                     return ExpansionPanel(
-                      isExpanded: p.conditionsexpanded,
-                      headerBuilder: p.headerBuilder,
-                      body: Column(children: p.buildConditionsList()),
+                      isExpanded: personData[idx].conditionsexpanded,
+                      headerBuilder: personData[idx].headerBuilder,
+                      body: Column(
+                          children: personData[idx]
+                              .buildConditionsList(context, idx, conditions)),
                     );
-                  }).toList())),
-          SizedBox(
-            height: 72,
-          )
+                  }))),
+          SizedBox(height: 72)
         ]);
 
       case PageID.Results:
@@ -257,7 +282,7 @@ class ScrollableTabsState extends State<ScrollableTabs>
                 onSort: (i, b) {},
               ),
             ],
-            rows: _personData
+            rows: personData
                 .map((p) => DataRow(cells: [
                       DataCell(Text(p.name), onTap: () {}),
                       DataCell(Text(p.hastopay.toStringAsFixed(2) + ' \€'),
@@ -270,7 +295,7 @@ class ScrollableTabsState extends State<ScrollableTabs>
     return null;
   }
 
-  Widget _buildFloatingActionButton() {
+  Widget buildFloatingActionButton() {
     switch (_pageid) {
       case PageID.Persons:
         return Row(mainAxisAlignment: MainAxisAlignment.end, children: [
@@ -279,9 +304,7 @@ class ScrollableTabsState extends State<ScrollableTabs>
             tooltip: 'Remove',
             child: Icon(Icons.remove),
           ),
-          SizedBox(
-            width: 8,
-          ),
+          SizedBox(width: 8),
           FloatingActionButton(
             onPressed: _add,
             tooltip: 'Add',
@@ -327,12 +350,12 @@ class ScrollableTabsState extends State<ScrollableTabs>
                     margin:
                         EdgeInsets.all(_pageid == PageID.Conditions ? 4 : 8),
                     alignment: Alignment(0.0, -1.0),
-                    child:
-                        SingleChildScrollView(child: _createTabForms(pageidx))),
+                    child: SingleChildScrollView(
+                        child: createTabForms(context, pageidx))),
               );
             },
           )),
-      floatingActionButton: _buildFloatingActionButton(),
+      floatingActionButton: buildFloatingActionButton(),
     );
   }
 }
