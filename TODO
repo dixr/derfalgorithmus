@@ -1,3 +1,8 @@
-- implement edit conditions dialog
-- replace "-" button with trash can at the end of each row on persons tab
+- implement edit conditions dialog:
+  - handle isNew
+  - handle onChanged in text fields
+  - hanle onPressed for buttons
+- replace "-" button with Icons.delete_forever can at the end of each row on persons tab
 - ask for confirmation when deleting
+- move unnecessary code out of setState
+- change euro for other currencies

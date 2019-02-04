@@ -66,7 +66,8 @@ class PersonData {
           return [
             Divider(height: 1),
             InkWell(
-                onTap: () => c.showEditDialog(context),
+                onTap: () => c.showEditDialog(context,
+                    conditions), // if this doesn't work without setState, pass a callback from ScrollableTabsState
                 child: Padding(
                     padding: EdgeInsets.all(16),
                     child: Row(children: [
@@ -100,12 +101,66 @@ class ConditionData {
   String name = "";
   double price = 0.0;
   List<int> persons = [];
+  bool isNew = true;
 
-  void showEditDialog(BuildContext context) {
+  void showEditDialog(BuildContext context, List<ConditionData> conditions) {
     showDialog(
       context: context,
-      builder: (BuildContext context) => Container(),
-    ); // need .then(() => setState)?
+      builder: (BuildContext context) => SimpleDialog(
+              title: Text(isNew ? 'Add new condition' : 'Edit condition'),
+              children: [
+                Container(
+                    margin: EdgeInsets.fromLTRB(12, 0, 12, 8),
+                    child: TextField(
+                      textCapitalization: TextCapitalization.words,
+                      decoration: InputDecoration(
+                        border: UnderlineInputBorder(),
+                        filled: true,
+                        hintText: 'What do they have to pay for?',
+                        labelText:
+                            'Condition ' + (conditions.length + 1).toString(),
+                      ),
+                      onChanged: (value) => () {},
+                    )),
+                Container(
+                    margin: EdgeInsets.fromLTRB(12, 0, 12, 8),
+                    child: TextField(
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                          border: UnderlineInputBorder(),
+                          filled: true,
+                          labelText: 'Price',
+                          prefixText: '\€ ',
+                          suffixText: 'Euro',
+                          suffixStyle: TextStyle(color: Colors.green)),
+                      onChanged: (value) => () {},
+                      maxLines: 1,
+                    )),
+                //Divider(height: 1),
+                Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Center(
+                          child: FlatButton(
+                              onPressed: () {},
+                              child: Row(children: [
+                                Icon(Icons.delete_forever),
+                                Text('REMOVE')
+                              ]))),
+                      Center(
+                          child: FlatButton(
+                              onPressed: () {},
+                              child: Row(children: [
+                                Icon(Icons.check),
+                                Text('SAVE')
+                              ]))),
+                    ]),
+              ]),
+      // Navigator.pop(context, 'user03@gmail.com');
+    ).then((value) {
+      // parse value, need to call setState to save?
+    });
   }
 }
 
