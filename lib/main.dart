@@ -59,15 +59,14 @@ class PersonData {
   }
 
   List<Widget> buildConditionsList(
-      BuildContext context, int myIdx, List<ConditionData> conditions) {
-    return conditions
+      BuildContext context, int myIdx, ScrollableTabsState state) {
+    return state.conditions
         .where((c) => c.persons.contains(myIdx))
         .map((c) {
           return [
             Divider(height: 1),
             InkWell(
-                onTap: () => c.showEditDialog(context,
-                    conditions), // if this doesn't work without setState, pass a callback from ScrollableTabsState
+                onTap: () => c.showEditDialog(context, state),
                 child: Padding(
                     padding: EdgeInsets.all(16),
                     child: Row(children: [
@@ -103,63 +102,96 @@ class ConditionData {
   List<int> persons = [];
   bool isNew = true;
 
-  void showEditDialog(BuildContext context, List<ConditionData> conditions) {
+  void showEditDialog(BuildContext context, ScrollableTabsState state) {
     showDialog(
       context: context,
-      builder: (BuildContext context) => SimpleDialog(
-              title: Text(isNew ? 'Add new condition' : 'Edit condition'),
-              children: [
-                Container(
-                    margin: EdgeInsets.fromLTRB(12, 0, 12, 8),
-                    child: TextField(
-                      textCapitalization: TextCapitalization.words,
-                      decoration: InputDecoration(
-                        border: UnderlineInputBorder(),
-                        filled: true,
-                        hintText: 'What do they have to pay for?',
-                        labelText:
-                            'Condition ' + (conditions.length + 1).toString(),
-                      ),
-                      onChanged: (value) => () {},
-                    )),
-                Container(
-                    margin: EdgeInsets.fromLTRB(12, 0, 12, 8),
-                    child: TextField(
-                      keyboardType: TextInputType.number,
-                      decoration: InputDecoration(
-                          border: UnderlineInputBorder(),
-                          filled: true,
-                          labelText: 'Price',
-                          prefixText: '\€ ',
-                          suffixText: 'Euro',
-                          suffixStyle: TextStyle(color: Colors.green)),
-                      onChanged: (value) => () {},
-                      maxLines: 1,
-                    )),
-                //Divider(height: 1),
-                Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Center(
-                          child: FlatButton(
-                              onPressed: () {},
-                              child: Row(children: [
-                                Icon(Icons.delete_forever),
-                                Text('REMOVE')
-                              ]))),
-                      Center(
-                          child: FlatButton(
-                              onPressed: () {},
-                              child: Row(children: [
-                                Icon(Icons.check),
-                                Text('SAVE')
-                              ]))),
-                    ]),
-              ]),
-      // Navigator.pop(context, 'user03@gmail.com');
+      builder: (context) => StatefulBuilder(
+          builder: (context, setState) => SimpleDialog(
+                  title: Text(isNew ? 'Add new condition' : 'Edit condition'),
+                  children: [
+                    Container(
+                        margin: EdgeInsets.fromLTRB(12, 0, 12, 8),
+                        child: Container(
+                            height: 6 * 48.0, // TODO: size appropriately
+                            child: ListView(
+                              shrinkWrap: true,
+                              //itemExtent: 48,
+                              children: [
+                                TextField(
+                                  textCapitalization: TextCapitalization.words,
+                                  decoration: InputDecoration(
+                                    border: UnderlineInputBorder(),
+                                    filled: true,
+                                    hintText: 'What do they have to pay for?',
+                                    labelText: 'Condition ' +
+                                        (state.conditions.length + 1)
+                                            .toString(),
+                                  ),
+                                  onChanged: (value) => setState(() {
+                                        name = value;
+                                      }),
+                                ),
+                                TextField(
+                                  keyboardType: TextInputType.number,
+                                  decoration: InputDecoration(
+                                      border: UnderlineInputBorder(),
+                                      filled: true,
+                                      labelText: 'Price',
+                                      prefixText: '\€ ',
+                                      suffixText: 'Euro',
+                                      suffixStyle:
+                                          TextStyle(color: Colors.green)),
+                                  onChanged: (value) => setState(() {
+                                        price = double.tryParse(
+                                                value.replaceAll(',', '.')) ??
+                                            0.0;
+                                      }),
+                                  maxLines: 1,
+                                )
+                              ]..addAll(
+                                  List.generate(state.personData.length, (idx) {
+                                    return CheckboxListTile(
+                                      title: Text(state.personData[idx].name),
+                                      value: persons.contains(idx),
+                                      secondary: Icon(Icons.person),
+                                      onChanged: (value) => setState(() {
+                                            if (value) {
+                                              if (!persons.contains(idx))
+                                                persons.add(idx);
+                                            } else
+                                              persons.remove(idx);
+                                          }),
+                                    );
+                                  }),
+                                ),
+                            ))),
+                    Container(
+                        margin: EdgeInsets.fromLTRB(12, 0, 12, 0),
+                        child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Center(
+                                  child: FlatButton(
+                                      onPressed: () =>
+                                          Navigator.pop(context, 'REMOVE'),
+                                      child: Row(children: [
+                                        Icon(Icons.delete_forever),
+                                        Text('REMOVE')
+                                      ]))),
+                              Center(
+                                  child: FlatButton(
+                                      onPressed: () =>
+                                          Navigator.pop(context, 'SAVE'),
+                                      child: Row(children: [
+                                        Icon(Icons.check),
+                                        Text('SAVE')
+                                      ]))),
+                            ])),
+                  ])),
     ).then((value) {
-      // parse value, need to call setState to save?
+      if (value == 'REMOVE') persons.clear();
+      state.updateResults();
     });
   }
 }
@@ -240,6 +272,7 @@ class ScrollableTabsState extends State<ScrollableTabs>
 
   void updateResults() {
     setState(() {
+      conditions.removeWhere((c) => c.persons.isEmpty);
       for (int i = 0; i < personData.length; ++i) {
         if (personData[i].namecontroller.text.isNotEmpty)
           personData[i].name = personData[i].namecontroller.text;
@@ -254,6 +287,10 @@ class ScrollableTabsState extends State<ScrollableTabs>
       for (int i = 0; i < personData.length; ++i)
         personData[i].hastopay = sum - personData[i].paid;
     });
+  }
+
+  void setStateOutside(VoidCallback fn) {
+    setState(fn);
   }
 
   Widget createTabForms(BuildContext context, int pageidx) {
@@ -281,18 +318,19 @@ class ScrollableTabsState extends State<ScrollableTabs>
                     ),
                     SizedBox(width: 8),
                     Expanded(
-                        child: TextField(
-                      controller: personData[idx].paidcontroller,
-                      keyboardType: TextInputType.number,
-                      decoration: InputDecoration(
-                          border: UnderlineInputBorder(),
-                          labelText: 'Money paid',
-                          prefixText: '\€ ',
-                          suffixText: 'Euro',
-                          suffixStyle: TextStyle(color: Colors.green)),
-                      onChanged: (value) => updateResults(),
-                      maxLines: 1,
-                    ))
+                      child: TextField(
+                        controller: personData[idx].paidcontroller,
+                        keyboardType: TextInputType.number,
+                        decoration: InputDecoration(
+                            border: UnderlineInputBorder(),
+                            labelText: 'Money paid',
+                            prefixText: '\€ ',
+                            suffixText: 'Euro',
+                            suffixStyle: TextStyle(color: Colors.green)),
+                        onChanged: (value) => updateResults(),
+                        maxLines: 1,
+                      ),
+                    )
                   ]));
             })),
           ),
@@ -315,7 +353,7 @@ class ScrollableTabsState extends State<ScrollableTabs>
                       headerBuilder: personData[idx].headerBuilder,
                       body: Column(
                           children: personData[idx]
-                              .buildConditionsList(context, idx, conditions)),
+                              .buildConditionsList(context, idx, this)),
                     );
                   }))),
           SizedBox(height: 72)

@@ -1,8 +1,9 @@
+- update arithmetics with conditions
 - implement edit conditions dialog:
   - handle isNew
-  - handle onChanged in text fields
-  - hanle onPressed for buttons
+- remove setStateOutside
 - replace "-" button with Icons.delete_forever can at the end of each row on persons tab
 - ask for confirmation when deleting
 - move unnecessary code out of setState
 - change euro for other currencies
+- option to save / restore data (or just store data, for now)
