@@ -1,9 +1,6 @@
-- update arithmetics with conditions
-- implement edit conditions dialog:
-  - handle isNew
-- remove setStateOutside
+- is there a better solution than showing a snackbar if totalconditionsprice > money in the pot?
 - replace "-" button with Icons.delete_forever can at the end of each row on persons tab
 - ask for confirmation when deleting
 - move unnecessary code out of setState
-- change euro for other currencies
+- allow other currencies
 - option to save / restore data (or just store data, for now)

@@ -95,12 +95,18 @@ class PersonData {
 }
 
 class ConditionData {
-  ConditionData(this.name, this.price, this.persons);
+  ConditionData(String _label)
+      : label = _label,
+        name = _label;
 
-  String name = "";
+  final String label;
+  String name;
   double price = 0.0;
   List<int> persons = [];
   bool isNew = true;
+
+  TextEditingController namecontroller = TextEditingController();
+  TextEditingController pricecontroller = TextEditingController();
 
   void showEditDialog(BuildContext context, ScrollableTabsState state) {
     showDialog(
@@ -115,28 +121,28 @@ class ConditionData {
                             height: 6 * 48.0, // TODO: size appropriately
                             child: ListView(
                               shrinkWrap: true,
-                              //itemExtent: 48,
                               children: [
                                 TextField(
+                                  controller: namecontroller,
                                   textCapitalization: TextCapitalization.words,
                                   decoration: InputDecoration(
                                     border: UnderlineInputBorder(),
                                     filled: true,
                                     hintText: 'What do they have to pay for?',
-                                    labelText: 'Condition ' +
-                                        (state.conditions.length + 1)
-                                            .toString(),
+                                    labelText: label,
                                   ),
                                   onChanged: (value) => setState(() {
                                         name = value;
                                       }),
                                 ),
                                 TextField(
+                                  controller: pricecontroller,
                                   keyboardType: TextInputType.number,
                                   decoration: InputDecoration(
                                       border: UnderlineInputBorder(),
                                       filled: true,
-                                      labelText: 'Price',
+                                      labelText: 'Price per person',
+                                      hintText: 'How much did it cost?',
                                       prefixText: '\€ ',
                                       suffixText: 'Euro',
                                       suffixStyle:
@@ -191,6 +197,12 @@ class ConditionData {
                   ])),
     ).then((value) {
       if (value == 'REMOVE') persons.clear();
+      if (!state.conditions.contains(this)) {
+        isNew = false;
+        namecontroller.text = name;
+        pricecontroller.text = price.toString();
+        state.conditions.add(this);
+      }
       state.updateResults();
     });
   }
@@ -210,6 +222,7 @@ class ScrollableTabsState extends State<ScrollableTabs>
 
   PageID _pageid = PageID.Persons;
   TabController _controller;
+  final _scaffoldKey = GlobalKey<ScaffoldState>();
 
   List<PersonData> personData = [
     PersonData('Person 1', 0),
@@ -218,10 +231,9 @@ class ScrollableTabsState extends State<ScrollableTabs>
     PersonData('Person 4', 0),
   ];
 
-  List<ConditionData> conditions = [
-    ConditionData('Coffee', 2.0, [1, 2, 5]),
-    ConditionData('Bread', 5.0, [0, 2, 20]),
-  ];
+  List<ConditionData> conditions = [];
+
+  String specialnote = '';
 
   @override
   void initState() {
@@ -242,13 +254,17 @@ class ScrollableTabsState extends State<ScrollableTabs>
     });
   }
 
-  void _add() {
+  void _add(BuildContext context) {
     switch (_pageid) {
       case PageID.Persons:
         setState(() {
           personData.add(
               PersonData('Person ' + (personData.length + 1).toString(), 0));
         });
+        break;
+      case PageID.Conditions:
+        ConditionData('Condition ' + (conditions.length + 1).toString())
+            .showEditDialog(context, this);
         break;
       default:
         break;
@@ -279,18 +295,34 @@ class ScrollableTabsState extends State<ScrollableTabs>
         personData[i].paid = double.tryParse(
                 personData[i].paidcontroller.text.replaceAll(',', '.')) ??
             0.0;
-        print(
-            personData[i].name + ': ' + personData[i].paid.toStringAsFixed(2));
       }
-      double sum =
-          personData.fold(0.0, (sum, p) => sum + p.paid) / personData.length;
+      double total = personData.fold(0.0, (total, p) => total + p.paid);
+      double priceperperson = total / personData.length;
       for (int i = 0; i < personData.length; ++i)
-        personData[i].hastopay = sum - personData[i].paid;
+        personData[i].hastopay = priceperperson - personData[i].paid;
+      for (ConditionData c in conditions) {
+        for (int i = 0; i < personData.length; ++i) {
+          personData[i].hastopay += (c.persons.contains(i) ? c.price : 0);
+          personData[i].hastopay -=
+              c.price * c.persons.length / personData.length;
+        }
+      }
+      double totalconditionsprice = conditions.fold(
+          0.0,
+          (totalconditionsprice, c) =>
+              totalconditionsprice + c.price * c.persons.length);
+      if (totalconditionsprice >= total + 0.01)
+        specialnote = 'Note: Total price of the conditions (' +
+            totalconditionsprice.toStringAsFixed(2) +
+            ') is greater than the total amount in the pot (' +
+            total.toStringAsFixed(2) +
+            ').';
+      else
+        specialnote = '';
     });
-  }
-
-  void setStateOutside(VoidCallback fn) {
-    setState(fn);
+    if (specialnote.isNotEmpty)
+      _scaffoldKey.currentState
+          .showSnackBar(SnackBar(content: Text(specialnote)));
   }
 
   Widget createTabForms(BuildContext context, int pageidx) {
@@ -323,8 +355,9 @@ class ScrollableTabsState extends State<ScrollableTabs>
                         keyboardType: TextInputType.number,
                         decoration: InputDecoration(
                             border: UnderlineInputBorder(),
-                            labelText: 'Money paid',
+                            labelText: 'Has paid',
                             prefixText: '\€ ',
+                            hintText: 'How much?',
                             suffixText: 'Euro',
                             suffixStyle: TextStyle(color: Colors.green)),
                         onChanged: (value) => updateResults(),
@@ -388,7 +421,7 @@ class ScrollableTabsState extends State<ScrollableTabs>
     return null;
   }
 
-  Widget buildFloatingActionButton() {
+  Widget buildFloatingActionButton(BuildContext context) {
     switch (_pageid) {
       case PageID.Persons:
         return Row(mainAxisAlignment: MainAxisAlignment.end, children: [
@@ -399,7 +432,7 @@ class ScrollableTabsState extends State<ScrollableTabs>
           ),
           SizedBox(width: 8),
           FloatingActionButton(
-            onPressed: _add,
+            onPressed: () => _add(context),
             tooltip: 'Add',
             child: Icon(Icons.add),
           ),
@@ -407,7 +440,7 @@ class ScrollableTabsState extends State<ScrollableTabs>
 
       case PageID.Conditions:
         return FloatingActionButton(
-          onPressed: _add,
+          onPressed: () => _add(context),
           tooltip: 'Add',
           child: Icon(Icons.add),
         );
@@ -421,6 +454,7 @@ class ScrollableTabsState extends State<ScrollableTabs>
   Widget build(BuildContext context) {
     super.build(context);
     return Scaffold(
+      key: _scaffoldKey,
       appBar: AppBar(
           title: Text('DerFAlgorithmus'),
           bottom: TabBar(
@@ -448,7 +482,7 @@ class ScrollableTabsState extends State<ScrollableTabs>
               );
             },
           )),
-      floatingActionButton: buildFloatingActionButton(),
+      floatingActionButton: buildFloatingActionButton(context),
     );
   }
 }
