@@ -233,6 +233,10 @@ class ScrollableTabsState extends State<ScrollableTabs>
 
   List<ConditionData> conditions = [];
 
+  double totalpaid = 0.0;
+  double totalconditions = 0.0;
+  double priceperperson = 0.0;
+
   String specialnote = '';
 
   @override
@@ -288,6 +292,7 @@ class ScrollableTabsState extends State<ScrollableTabs>
 
   void updateResults() {
     setState(() {
+      // update data structures
       conditions.removeWhere((c) => c.persons.isEmpty);
       for (int i = 0; i < personData.length; ++i) {
         if (personData[i].namecontroller.text.isNotEmpty)
@@ -296,33 +301,83 @@ class ScrollableTabsState extends State<ScrollableTabs>
                 personData[i].paidcontroller.text.replaceAll(',', '.')) ??
             0.0;
       }
-      double total = personData.fold(0.0, (total, p) => total + p.paid);
-      double priceperperson = total / personData.length;
-      for (int i = 0; i < personData.length; ++i)
-        personData[i].hastopay = priceperperson - personData[i].paid;
-      for (ConditionData c in conditions) {
-        for (int i = 0; i < personData.length; ++i) {
-          personData[i].hastopay += (c.persons.contains(i) ? c.price : 0);
-          personData[i].hastopay -=
-              c.price * c.persons.length / personData.length;
-        }
+      // sum up what was paid
+      totalpaid = personData.fold(0.0, (total, p) => total + p.paid);
+      // sum up conditions
+      totalconditions = 0.0;
+      for (int i = 0; i < personData.length; ++i) {
+        personData[i].conditionstopay = 0.0;
+        for (ConditionData c in conditions)
+          if (c.persons.contains(i)) personData[i].conditionstopay += c.price;
+        totalconditions += personData[i].conditionstopay;
       }
-      double totalconditionsprice = conditions.fold(
-          0.0,
-          (totalconditionsprice, c) =>
-              totalconditionsprice + c.price * c.persons.length);
-      if (totalconditionsprice >= total + 0.01)
+      // compute final prices
+      priceperperson = (totalpaid - totalconditions) / personData.length;
+      for (PersonData p in personData)
+        p.hastopay = priceperperson + p.conditionstopay - p.paid;
+      // check consistency
+      if (totalconditions >= totalpaid + 0.01)
         specialnote = 'Note: Total price of the conditions (' +
-            totalconditionsprice.toStringAsFixed(2) +
-            ') is greater than the total amount in the pot (' +
-            total.toStringAsFixed(2) +
+            totalconditions.toStringAsFixed(2) +
+            ') is greater than the total money spent (' +
+            totalpaid.toStringAsFixed(2) +
             ').';
       else
         specialnote = '';
     });
+    _scaffoldKey.currentState.removeCurrentSnackBar();
     if (specialnote.isNotEmpty)
-      _scaffoldKey.currentState
-          .showSnackBar(SnackBar(content: Text(specialnote)));
+      _scaffoldKey.currentState.showSnackBar(SnackBar(
+        content: Text(specialnote),
+        duration: Duration(seconds: 6),
+      ));
+  }
+
+  void displayInfoDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text("Details"),
+          content: ListView(shrinkWrap: true, children: [
+            Row(children: [
+              Expanded(child: Text('Total money spent:')),
+              Text(totalpaid.toStringAsFixed(2) + '\€ '),
+            ]),
+            Divider(height: 5),
+            Row(children: [
+              Expanded(child: Text('Total price of conditions:')),
+              Text(totalconditions.toStringAsFixed(2) + '\€ '),
+            ]),
+            Divider(height: 5),
+            Row(children: [
+              Expanded(child: Text('Remaining price to pay:')),
+              Text((totalpaid - totalconditions).toStringAsFixed(2) + '\€ '),
+            ]),
+            Divider(height: 5),
+            Row(children: [
+              Expanded(child: Text('Remaining per person:')),
+              Text(priceperperson.toStringAsFixed(2) + '\€ '),
+            ]),
+            Divider(height: 5),
+            Text('\nEach person has to pay the remaining price of ' +
+                priceperperson.toStringAsFixed(2) +
+                '\€ minus what they already paid plus the ' +
+                'sum over their respective conditions.'),
+          ]),
+          //  'Total money spent: ' + totalpaid.toStringAsFixed(2) + '\n'
+          //  'Total price of conditions: ' + totalconditions.toStringAsFixed(2)
+          actions: <Widget>[
+            new FlatButton(
+              child: Text('Close'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+          ],
+        );
+      },
+    );
   }
 
   Widget createTabForms(BuildContext context, int pageidx) {
@@ -393,30 +448,33 @@ class ScrollableTabsState extends State<ScrollableTabs>
         ]);
 
       case PageID.Results:
-        return Card(
-          elevation: 2,
-          child: DataTable(
-            columns: [
-              DataColumn(
-                label: Text('Person'),
-                onSort: (i, b) {},
-              ),
-              DataColumn(
-                label: Text('Has to pay'),
-                tooltip: 'The total amount of money this person has to pay.',
-                numeric: true,
-                onSort: (i, b) {},
-              ),
-            ],
-            rows: personData
-                .map((p) => DataRow(cells: [
-                      DataCell(Text(p.name), onTap: () {}),
-                      DataCell(Text(p.hastopay.toStringAsFixed(2) + ' \€'),
-                          onTap: () {}),
-                    ]))
-                .toList(),
+        return Column(children: [
+          Card(
+            elevation: 5,
+            child: DataTable(
+              columns: [
+                DataColumn(
+                  label: Text('Person'),
+                  onSort: (i, b) {},
+                ),
+                DataColumn(
+                  label: Text('Has to pay'),
+                  tooltip: 'The total amount of money this person has to pay.',
+                  numeric: true,
+                  onSort: (i, b) {},
+                ),
+              ],
+              rows: personData
+                  .map((p) => DataRow(cells: [
+                        DataCell(Text(p.name), onTap: () {}),
+                        DataCell(Text(p.hastopay.toStringAsFixed(2) + ' \€'),
+                            onTap: () {}),
+                      ]))
+                  .toList(),
+            ),
           ),
-        );
+          SizedBox(height: 72)
+        ]);
     }
     return null;
   }
@@ -443,6 +501,13 @@ class ScrollableTabsState extends State<ScrollableTabs>
           onPressed: () => _add(context),
           tooltip: 'Add',
           child: Icon(Icons.add),
+        );
+
+      case PageID.Results:
+        return FloatingActionButton(
+          onPressed: () => displayInfoDialog(context),
+          tooltip: 'Info',
+          child: Icon(Icons.info_outline),
         );
 
       default:

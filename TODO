@@ -1,10 +1,8 @@
-- simplify algorithm (first subtract conditions then split the rest)
-- snackbar on results screen showing (rest / number of persons)
-- prevent "snap in" after switching tabs (-> understand reason from source code of expansion panel / card widgets?)
-- is there a better solution than showing a snackbar if totalconditionsprice > money in the pot?
+- prevent "snap in" after switching tabs
+  (-> understand reason from source code of expansion panel / card widgets? elevation?)
 - replace "-" button with Icons.delete_forever can at the end of each row on persons tab
 - ask for confirmation when deleting
-- move unnecessary code out of setState
+- move unnecessary code out of set state
 - allow other currencies
 - option to save / restore data (or just store data, for now)
 - add other languages
